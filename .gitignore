@@ -22,6 +22,11 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
+datasets/raw/
+datasets/crackmouse/
+datasets/trodo/stage1_full_odometer
+datasets/trodo/stage2_digits_only
+
 .installed.cfg
 *.egg
 MANIFEST
