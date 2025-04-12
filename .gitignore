@@ -26,6 +26,7 @@ datasets/raw/
 datasets/crackmouse/
 datasets/trodo/stage1_full_odometer
 datasets/trodo/stage2_digits_only
+AS_Task_Odometer.docx
 
 .installed.cfg
 *.egg
