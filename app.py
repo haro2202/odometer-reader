@@ -10,7 +10,7 @@ import tempfile
 st.set_page_config(page_title="Odometer Reader", layout="wide")
 
 st.sidebar.header("🔧 Detection Parameters")
-MIN_CONFIDENCE = st.sidebar.slider("Min Confidence", 0.1, 1.0, 0.5, 0.05)
+MIN_CONFIDENCE = st.sidebar.slider("Min Confidence", 0.1, 1.0, 0.4, 0.05)
 DBSCAN_PARAMS = {
     "eps": st.sidebar.slider("DBSCAN - eps", 5, 50, 30),
     "min_samples": st.sidebar.slider("DBSCAN - min_samples", 1, 10, 2)
