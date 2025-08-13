@@ -16,8 +16,13 @@ logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
 
 def load_models():
     return (
-        YOLO("runs/train/odometer_detector/weights/best.pt"),
+        # YOLO("runs/train/odometer_detector/weights/best.pt"),
+        # YOLO("runs/train/odometer_detector/weights/last.pt"),
+        # YOLO("runs/train/digit_detector/weights/best.pt")
+        # YOLO("runs/train/digit_detector/weights/last.pt")
+        YOLO("runs/hello/best.pt"),
         YOLO("runs/train/digit_detector/weights/best.pt")
+        # YOLO("runs/hello/yolov8-persian-digit-classification-V0.1.pt")
     )
 
 
@@ -149,12 +154,15 @@ def rotate_digits(digits, image_path, angle_deg, expand=False):
     return rotated_digits
 
 
-def detect_digits_batch(model, image_paths, squeeze_y=False):
+def detect_digits_batch(model, image_paths, squeeze_y=False, min_confidence=0.5):
     if isinstance(image_paths, (str, Path)):
         results = model.predict(str(image_paths), iou=.4, conf=.4)
         digits = []
         for b in results[0].boxes.data:
             x1, y1, x2, y2, conf, cls = b.tolist()
+            # Lọc theo confidence threshold
+            # if conf < min_confidence:
+            #     continue
             digits.append({
                 "class": int(cls),
                 "x": (x1 + x2) / 2,
