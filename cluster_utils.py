@@ -16,7 +16,7 @@ logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
 
 def load_models():
     return (
-        # YOLO("runs/train/odometer_detector/weights/best.pt"),
+        YOLO("runs/train/odometer_detector/weights/best.pt"),
         # YOLO("runs/train/odometer_detector/weights/last.pt"),
         # YOLO("runs/train/digit_detector/weights/best.pt")
         # YOLO("runs/train/digit_detector/weights/last.pt")
@@ -44,22 +44,34 @@ def norm(val):
 
 def detect_odometer_boxes_batch(model, image_paths):
     if isinstance(image_paths, (str, Path)):
-        results = model.predict(str(image_paths))
-        for b in results[0].boxes.data:
-            if int(b[5]) == 0:
-                x1, y1, x2, y2 = map(int, b[:4])
-                return x1, y1, x2, y2
+        # Ensure the image path exists and is valid
+        image_path = Path(image_paths)
+        if not image_path.exists():
+            return None
+        
+        results = model.predict(str(image_path), verbose=False)
+        if results and len(results) > 0 and results[0].boxes is not None:
+            for b in results[0].boxes.data:
+                if int(b[5]) == 0:
+                    x1, y1, x2, y2 = map(int, b[:4])
+                    return x1, y1, x2, y2
         return None
 
     od_boxes = {}
-    results = model.predict([str(p) for p in image_paths])
-    for idx, (img_path, result) in enumerate(zip(image_paths, results)):
+    # Filter out non-existent paths
+    valid_paths = [p for p in image_paths if Path(p).exists()]
+    if not valid_paths:
+        return od_boxes
+        
+    results = model.predict([str(p) for p in valid_paths], verbose=False)
+    for idx, (img_path, result) in enumerate(zip(valid_paths, results)):
         box = None
-        for b in results[idx].boxes.data:
-            if int(b[5]) == 0:
-                x1, y1, x2, y2 = map(int, b[:4])
-                box = (x1, y1, x2, y2)
-                break
+        if result.boxes is not None:
+            for b in result.boxes.data:
+                if int(b[5]) == 0:
+                    x1, y1, x2, y2 = map(int, b[:4])
+                    box = (x1, y1, x2, y2)
+                    break
         od_boxes[str(img_path)] = box
     return od_boxes
 
@@ -156,36 +168,48 @@ def rotate_digits(digits, image_path, angle_deg, expand=False):
 
 def detect_digits_batch(model, image_paths, squeeze_y=False, min_confidence=0.5):
     if isinstance(image_paths, (str, Path)):
-        results = model.predict(str(image_paths), iou=.4, conf=.4)
+        # Ensure the image path exists and is valid
+        image_path = Path(image_paths)
+        if not image_path.exists():
+            return []
+        
+        results = model.predict(str(image_path), iou=.4, conf=.4, verbose=False)
         digits = []
-        for b in results[0].boxes.data:
-            x1, y1, x2, y2, conf, cls = b.tolist()
-            # Lọc theo confidence threshold
-            # if conf < min_confidence:
-            #     continue
-            digits.append({
-                "class": int(cls),
-                "x": (x1 + x2) / 2,
-                "y": (y1 + y2) / 2,
-                "bbox": [x1 + (x2 - x1) / 5, y1 + (y2 - y1) / 5, x2 - (x2 - x1) / 5,
-                         y2 - (y2 - y1) / 5] if squeeze_y else [x1, y1, x2, y2],
-                "conf": conf
-            })
+        if results and len(results) > 0 and results[0].boxes is not None:
+            for b in results[0].boxes.data:
+                x1, y1, x2, y2, conf, cls = b.tolist()
+                # Lọc theo confidence threshold
+                # if conf < min_confidence:
+                #     continue
+                digits.append({
+                    "class": int(cls),
+                    "x": (x1 + x2) / 2,
+                    "y": (y1 + y2) / 2,
+                    "bbox": [x1 + (x2 - x1) / 5, y1 + (y2 - y1) / 5, x2 - (x2 - x1) / 5,
+                             y2 - (y2 - y1) / 5] if squeeze_y else [x1, y1, x2, y2],
+                    "conf": conf
+                })
         return digits
 
     digit_dict = {}
-    results = model.predict([str(p) for p in image_paths])
-    for idx, (img_path, res) in enumerate(zip(image_paths, results)):
+    # Filter out non-existent paths
+    valid_paths = [p for p in image_paths if Path(p).exists()]
+    if not valid_paths:
+        return digit_dict
+        
+    results = model.predict([str(p) for p in valid_paths], verbose=False)
+    for idx, (img_path, res) in enumerate(zip(valid_paths, results)):
         digits = []
-        for b in results[idx].boxes.data:
-            x1, y1, x2, y2, conf, cls = b.tolist()
-            digits.append({
-                "class": int(cls),
-                "x": (x1 + x2) / 2,
-                "y": (y1 + y2) / 2,
-                "bbox": [x1, y1, x2, y2],
-                "conf": conf
-            })
+        if res.boxes is not None:
+            for b in res.boxes.data:
+                x1, y1, x2, y2, conf, cls = b.tolist()
+                digits.append({
+                    "class": int(cls),
+                    "x": (x1 + x2) / 2,
+                    "y": (y1 + y2) / 2,
+                    "bbox": [x1, y1, x2, y2],
+                    "conf": conf
+                })
         digit_dict[str(img_path)] = digits
     return digit_dict
 

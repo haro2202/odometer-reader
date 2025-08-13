@@ -17,7 +17,7 @@ DBSCAN_PARAMS = {
 }
 
 # --- Load models ---
-od_model, digit_model = load_models()
+od_model1, od_model2, digit_model = load_models()
 mileage_labels = load_groundtruth()
 
 
@@ -71,18 +71,21 @@ def draw_cluster_boxes(image, clusters, color="blue"):
 
 
 def process_image_pipeline(img_path: Path, title: str):
-    st.image(str(img_path), caption=f"{title} - Step 1: Uploaded Image", use_column_width=True)
+    st.image(str(img_path), caption=f"{title} - Step 1: Uploaded Image", use_container_width=True)
 
-    od_box = detect_odometer_boxes_batch(od_model, img_path)
+    od_box = detect_odometer_boxes_batch(od_model1, img_path)
     if not od_box:
-        st.error("❌ No odometer detected.")
-        return
+        od_box = detect_odometer_boxes_batch(od_model2, img_path)
+        if not od_box:
+            st.error("❌ No odometer detected.")
+            return
+    
 
     od_img = draw_odometer_box(img_path, od_box)
-    st.image(od_img, caption="Step 2: Odometer Detection", use_column_width=True)
+    st.image(od_img, caption="Step 2: Odometer Detection", use_container_width=True)
 
     crop_path = crop_odometer_regions(img_path, od_box)
-    st.image(crop_path, caption="Step 3: Cropped Region", use_column_width=True)
+    st.image(crop_path, caption="Step 3: Cropped Region", use_container_width=True)
 
     digits = detect_digits_batch(digit_model, crop_path)
     print(f"Raw detected digits: {len(digits)} detections")
@@ -94,7 +97,7 @@ def process_image_pipeline(img_path: Path, title: str):
     angle = estimate_rotation_mode_angle(digits)
 
     crop_predicted = draw_digit_boxes(Image.open(crop_path).copy(), digits)
-    st.image(crop_predicted, caption=f"Step 4: Filtered Digits (conf >= {MIN_CONFIDENCE:.1f})", use_column_width=True)
+    st.image(crop_predicted, caption=f"Step 4: Filtered Digits (conf >= {MIN_CONFIDENCE:.1f})", use_container_width=True)
 
     # rotated_image_path = rotate_odometer_regions(crop_path, angle)
 
@@ -105,12 +108,12 @@ def process_image_pipeline(img_path: Path, title: str):
     # rotated_digits = merge_digit_predictions(rotated_digits, rotated_image_digits)
 
     # rotated_img = draw_digit_boxes(Image.open(rotated_image_path).copy(), rotated_digits)
-    # st.image(rotated_img, caption=f"Step 4: Rotated Digits (angle={angle:.1f}°)", use_column_width=True)
+    # st.image(rotated_img, caption=f"Step 4: Rotated Digits (angle={angle:.1f}°)", use_container_width=True)
 
     clusters = cluster_digits(digits, **DBSCAN_PARAMS)
 
     cluster_img = draw_cluster_boxes(Image.open(crop_path).copy(), clusters)
-    st.image(cluster_img, caption="Step 5: Clustered Digits", use_column_width=True)
+    st.image(cluster_img, caption="Step 5: Clustered Digits", use_container_width=True)
 
     prediction = norm(clusters[0]["digits"]) if clusters else None
     st.success(f"Prediction: `{prediction}`")
@@ -134,45 +137,45 @@ if user_file:
     process_image_pipeline(img_path, "User Uploaded")
 
 
-# --- Batch Evaluation ---
-st.header("📊 Batch Evaluation on Test Set")
-RESULTS_PATH = Path("datasets/trodo/test_set/results.csv")
-if st.button("Update Results") or not RESULTS_PATH.exists():
-    with st.spinner("Evaluating test set..."):
-        test_dir = Path("datasets/trodo/test_set/images")
-        image_paths = sorted(test_dir.glob("*.jpg"))
-        results = []
-        for sel_path in image_paths:
-            box = detect_odometer_boxes_batch(od_model, sel_path)
-            crop_path = crop_odometer_regions(sel_path, box)
-            digits = detect_digits_batch(digit_model, crop_path)
+# # --- Batch Evaluation ---
+# st.header("📊 Batch Evaluation on Test Set")
+# RESULTS_PATH = Path("datasets/trodo/test_set/results.csv")
+# if st.button("Update Results") or not RESULTS_PATH.exists():
+#     with st.spinner("Evaluating test set..."):
+#         test_dir = Path("datasets/trodo/test_set/images")
+#         image_paths = sorted(test_dir.glob("*.jpg"))
+#         results = []
+#         for sel_path in image_paths:
+#             box = detect_odometer_boxes_batch(od_model, sel_path)
+#             crop_path = crop_odometer_regions(sel_path, box)
+#             digits = detect_digits_batch(digit_model, crop_path)
             
-            # Áp dụng confidence filtering
-            digits = filter_digits_by_confidence(digits, MIN_CONFIDENCE)
+#             # Áp dụng confidence filtering
+#             digits = filter_digits_by_confidence(digits, MIN_CONFIDENCE)
             
-            angle = estimate_rotation_mode_angle(digits)
-            rotated_path = rotate_odometer_regions(crop_path, angle)
-            rotated_image_digits = detect_digits_batch(digit_model, rotated_path)
+#             angle = estimate_rotation_mode_angle(digits)
+#             rotated_path = rotate_odometer_regions(crop_path, angle)
+#             rotated_image_digits = detect_digits_batch(digit_model, rotated_path)
             
-            # Lọc cả rotated digits
-            rotated_image_digits = filter_digits_by_confidence(rotated_image_digits, MIN_CONFIDENCE)
+#             # Lọc cả rotated digits
+#             rotated_image_digits = filter_digits_by_confidence(rotated_image_digits, MIN_CONFIDENCE)
             
-            rotated_digits = rotate_digits(digits, crop_path, angle, True)
+#             rotated_digits = rotate_digits(digits, crop_path, angle, True)
 
-            rotated_digits = merge_digit_predictions(rotated_digits, rotated_image_digits)
+#             rotated_digits = merge_digit_predictions(rotated_digits, rotated_image_digits)
 
-            clusters = cluster_digits(rotated_digits, **DBSCAN_PARAMS)
+#             clusters = cluster_digits(rotated_digits, **DBSCAN_PARAMS)
 
-            prediction = norm(clusters[0]["digits"]) if clusters else None
-            truth = norm(mileage_labels.get(sel_path.name))
+#             prediction = norm(clusters[0]["digits"]) if clusters else None
+#             truth = norm(mileage_labels.get(sel_path.name))
 
-            results.append({
-                "filename": sel_path.name,
-                "prediction": prediction,
-                "truth": truth,
-                "Match": prediction == truth
-            })
-        pd.DataFrame(results).to_csv(RESULTS_PATH, index=False)
+#             results.append({
+#                 "filename": sel_path.name,
+#                 "prediction": prediction,
+#                 "truth": truth,
+#                 "Match": prediction == truth
+#             })
+#         pd.DataFrame(results).to_csv(RESULTS_PATH, index=False)
 
 # if RESULTS_PATH.exists():
 #     df = pd.read_csv(RESULTS_PATH)
